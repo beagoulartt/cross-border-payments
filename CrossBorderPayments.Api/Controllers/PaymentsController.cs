@@ -119,6 +119,72 @@ public class PaymentsController : ControllerBase
             ToDto(payment));
     }
 
+
+[HttpPatch("{id:int}/status")]
+public async Task<ActionResult<PaymentDto>> UpdatePaymentStatus(
+    int id,
+    UpdatePaymentStatusDto request)
+{
+    var payment = await _context.Payments
+        .Include(payment => payment.Beneficiary)
+        .FirstOrDefaultAsync(payment => payment.Id == id);
+
+    if (payment is null)
+    {
+        return NotFound(new
+        {
+            message = $"Payment with ID {id} was not found."
+        });
+    }
+
+    var newStatus = request.Status!.Value;
+
+    if (!IsValidStatusTransition(payment.Status, newStatus))
+    {
+        return BadRequest(new
+        {
+            message =
+                $"Payment cannot move from {payment.Status} to {newStatus}."
+        });
+    }
+
+    payment.Status = newStatus;
+
+    await _context.SaveChangesAsync();
+
+    return Ok(ToDto(payment));
+}
+
+private static bool IsValidStatusTransition(
+    PaymentStatus currentStatus,
+    PaymentStatus newStatus)
+{
+    return currentStatus switch
+    {
+        PaymentStatus.Draft =>
+            newStatus == PaymentStatus.Submitted,
+
+        PaymentStatus.Submitted =>
+            newStatus is PaymentStatus.PendingApproval
+                or PaymentStatus.Rejected,
+
+        PaymentStatus.PendingApproval =>
+            newStatus is PaymentStatus.Processing
+                or PaymentStatus.Rejected,
+
+        PaymentStatus.Processing =>
+            newStatus is PaymentStatus.Completed
+                or PaymentStatus.Failed,
+
+        PaymentStatus.Completed => false,
+        PaymentStatus.Rejected => false,
+        PaymentStatus.Failed => false,
+
+        _ => false
+    };
+}
+
+
     private static PaymentDto ToDto(Payment payment)
     {
         return new PaymentDto
