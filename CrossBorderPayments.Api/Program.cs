@@ -24,9 +24,18 @@ builder.Services.AddOpenApi();
 
 builder.Services.AddScoped<CurrencyQuoteService>();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Frontend", policy =>
+    {
+        policy
+            .WithOrigins("http://localhost:5173")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
 var app = builder.Build();
-
-
 
 // Expose OpenAPI documentation during development.
 if (app.Environment.IsDevelopment())
@@ -35,6 +44,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors("Frontend");
 
 // Connect controller routes such as /api/beneficiaries.
 app.MapControllers();
