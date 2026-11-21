@@ -1,10 +1,12 @@
 using CrossBorderPayments.Api.DTOs;
 using CrossBorderPayments.Api.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace CrossBorderPayments.Api.Controllers;
 
 [ApiController]
+[Authorize(Roles = "User")]
 [Route("api/[controller]")]
 public class QuotesController : ControllerBase
 {
@@ -16,11 +18,16 @@ public class QuotesController : ControllerBase
     }
 
     [HttpPost]
-    public ActionResult<QuoteDto> CreateQuote(CreateQuoteDto request)
+    public async Task<ActionResult<QuoteDto>> CreateQuote(
+        CreateQuoteDto request,
+        CancellationToken cancellationToken)
     {
         try
         {
-            var quote = _quoteService.CreateQuote(request);
+            var quote = await _quoteService.CreateQuoteAsync(
+                request,
+                User.GetWorkspaceId(),
+                cancellationToken);
             return Ok(quote);
         }
         catch (ArgumentException exception)
@@ -29,6 +36,15 @@ public class QuotesController : ControllerBase
             {
                 message = exception.Message
             });
+        }
+        catch (InvalidOperationException exception)
+        {
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                new
+                {
+                    message = exception.Message
+                });
         }
     }
 }

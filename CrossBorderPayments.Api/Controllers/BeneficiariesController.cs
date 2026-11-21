@@ -1,12 +1,15 @@
 using CrossBorderPayments.Api.Data;
 using CrossBorderPayments.Api.DTOs;
 using CrossBorderPayments.Api.Models;
+using CrossBorderPayments.Api.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 namespace CrossBorderPayments.Api.Controllers;
 
 [ApiController]
+[Authorize(Roles = "User")]
 [Route("api/[controller]")]
 public class BeneficiariesController : ControllerBase
 {
@@ -20,8 +23,10 @@ public class BeneficiariesController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<BeneficiaryDto>>> GetBeneficiaries()
     {
+        var workspaceId = User.GetWorkspaceId();
         var beneficiaries = await _context.Beneficiaries
             .AsNoTracking()
+            .Where(beneficiary => beneficiary.WorkspaceId == workspaceId)
             .OrderByDescending(beneficiary => beneficiary.CreatedAtUtc)
             .ToListAsync();
 
@@ -31,9 +36,11 @@ public class BeneficiariesController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<BeneficiaryDto>> GetBeneficiary(int id)
     {
+        var workspaceId = User.GetWorkspaceId();
         var beneficiary = await _context.Beneficiaries
             .AsNoTracking()
-            .FirstOrDefaultAsync(beneficiary => beneficiary.Id == id);
+            .FirstOrDefaultAsync(beneficiary =>
+                beneficiary.Id == id && beneficiary.WorkspaceId == workspaceId);
 
         if (beneficiary is null)
         {
@@ -52,6 +59,7 @@ public class BeneficiariesController : ControllerBase
     {
         var beneficiary = new Beneficiary
         {
+            WorkspaceId = User.GetWorkspaceId(),
             Name = request.Name.Trim(),
             Country = request.Country.Trim(),
             Currency = request.Currency.Trim().ToUpperInvariant(),

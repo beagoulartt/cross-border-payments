@@ -17,8 +17,13 @@ public class AppDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        modelBuilder.Entity<Beneficiary>().HasIndex(beneficiary => beneficiary.WorkspaceId);
+
         modelBuilder.Entity<Payment>(entity =>
         {
+            entity.HasIndex(payment => payment.QuoteId).IsUnique();
+            entity.HasIndex(payment => payment.WorkspaceId);
+
             entity.Property(payment => payment.SourceAmount)
                 .HasPrecision(18, 2);
 

@@ -4,6 +4,12 @@ public class Payment
 {
     public int Id { get; set; }
 
+    public Guid WorkspaceId { get; set; }
+
+    public DateTime? SimulatedCompletionAtUtc { get; set; }
+
+    public Guid? QuoteId { get; set; }
+
     public int BeneficiaryId { get; set; }
 
     public Beneficiary? Beneficiary { get; set; }

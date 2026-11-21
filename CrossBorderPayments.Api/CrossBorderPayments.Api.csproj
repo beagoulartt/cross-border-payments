@@ -16,4 +16,25 @@
     <PackageReference Include="Microsoft.OpenApi" Version="2.10.0" />
   </ItemGroup>
 
+  <Target Name="PublishFrontend" AfterTargets="ComputeFilesToPublish">
+    <PropertyGroup>
+      <FrontendPath>$(MSBuildProjectDirectory)/../cross-border-payments-client</FrontendPath>
+      <FrontendBuildPath>$(MSBuildProjectDirectory)/$(IntermediateOutputPath)frontend</FrontendBuildPath>
+    </PropertyGroup>
+    <ItemGroup>
+      <FrontendSource Include="$(FrontendPath)/**/*"
+        Exclude="$(FrontendPath)/node_modules/**/*;$(FrontendPath)/dist/**/*;$(FrontendPath)/.*/**/*;$(FrontendPath)/.env*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(FrontendSource)"
+      DestinationFiles="@(FrontendSource->'$(FrontendBuildPath)/%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Exec WorkingDirectory="$(FrontendBuildPath)" Command="npm ci" />
+    <Exec WorkingDirectory="$(FrontendBuildPath)" Command="npm run build" />
+    <ItemGroup>
+      <FrontendFiles Include="$(FrontendBuildPath)/dist/**/*" />
+      <ResolvedFileToPublish Include="@(FrontendFiles)">
+        <RelativePath>wwwroot/%(RecursiveDir)%(Filename)%(Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
 </Project>

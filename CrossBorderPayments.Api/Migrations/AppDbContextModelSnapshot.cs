@@ -56,7 +56,12 @@ namespace CrossBorderPayments.Api.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("WorkspaceId");
 
                     b.ToTable("Beneficiaries");
                 });
@@ -91,6 +96,12 @@ namespace CrossBorderPayments.Api.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<Guid?>("QuoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("SimulatedCompletionAtUtc")
+                        .HasColumnType("datetime2");
+
                     b.Property<decimal>("SourceAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -102,9 +113,18 @@ namespace CrossBorderPayments.Api.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
                     b.HasIndex("BeneficiaryId");
+
+                    b.HasIndex("QuoteId")
+                        .IsUnique()
+                        .HasFilter("[QuoteId] IS NOT NULL");
+
+                    b.HasIndex("WorkspaceId");
 
                     b.ToTable("Payments");
                 });

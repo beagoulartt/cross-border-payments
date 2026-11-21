@@ -1,25 +1,41 @@
 using CrossBorderPayments.Api.DTOs;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace CrossBorderPayments.Api.Services;
 
 public class CurrencyQuoteService
 {
-    private static readonly Dictionary<string, decimal> CurrencyRates =
-        new(StringComparer.OrdinalIgnoreCase)
-        {
-            ["CAD"] = 1.00m,
-            ["USD"] = 0.73m,
-            ["EUR"] = 0.67m,
-            ["GBP"] = 0.56m,
-            ["BRL"] = 4.07m
-        };
+    private const decimal MaxPaymentAmount = 9_999_999_999_999_999.99m;
+    private readonly IExchangeRateProvider _exchangeRateProvider;
+    private readonly IMemoryCache _cache;
 
-    public QuoteDto CreateQuote(CreateQuoteDto request)
+    public CurrencyQuoteService(
+        IExchangeRateProvider exchangeRateProvider,
+        IMemoryCache cache)
+    {
+        _exchangeRateProvider = exchangeRateProvider;
+        _cache = cache;
+    }
+
+    public QuoteDto? FindQuote(Guid workspaceId, Guid quoteId) =>
+        _cache.Get<QuoteDto>((workspaceId, quoteId));
+
+    public async Task<QuoteDto> CreateQuoteAsync(
+        CreateQuoteDto request,
+        Guid workspaceId,
+        CancellationToken cancellationToken = default)
     {
         if (request.SourceAmount <= 0)
         {
             throw new ArgumentException(
                 "Source amount must be greater than zero.");
+        }
+
+        if (request.SourceAmount > MaxPaymentAmount ||
+            request.SourceAmount != Math.Round(request.SourceAmount, 2))
+        {
+            throw new ArgumentException(
+                "Enter a supported source amount with at most two decimal places.");
         }
 
         var sourceCurrency = request.SourceCurrency
@@ -30,29 +46,18 @@ public class CurrencyQuoteService
             .Trim()
             .ToUpperInvariant();
 
-        if (!CurrencyRates.TryGetValue(
-                sourceCurrency,
-                out var sourceRate))
-        {
-            throw new ArgumentException(
-                $"Currency {sourceCurrency} is not supported.");
-        }
-
-        if (!CurrencyRates.TryGetValue(
-                destinationCurrency,
-                out var destinationRate))
-        {
-            throw new ArgumentException(
-                $"Currency {destinationCurrency} is not supported.");
-        }
-
         if (sourceCurrency == destinationCurrency)
         {
             throw new ArgumentException(
                 "Source and destination currencies must be different.");
         }
 
-        var exchangeRate = destinationRate / sourceRate;
+        var rateResult = await _exchangeRateProvider.GetRateAsync(
+            sourceCurrency,
+            destinationCurrency,
+            cancellationToken);
+
+        var exchangeRate = rateResult.Rate;
 
         var fee = Math.Max(
             5m,
@@ -74,7 +79,13 @@ public class CurrencyQuoteService
             2,
             MidpointRounding.AwayFromZero);
 
-        return new QuoteDto
+        if (destinationAmount <= 0 || destinationAmount > MaxPaymentAmount)
+        {
+            throw new ArgumentException(
+                "The converted amount is outside the supported payment range.");
+        }
+
+        var quote = new QuoteDto
         {
             QuoteId = Guid.NewGuid(),
             SourceAmount = request.SourceAmount,
@@ -83,7 +94,12 @@ public class CurrencyQuoteService
             Fee = fee,
             DestinationAmount = destinationAmount,
             DestinationCurrency = destinationCurrency,
-            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10)
+            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
+            RateProvider = rateResult.Provider,
+            RateEffectiveDate = rateResult.EffectiveDate
         };
+
+        _cache.Set((workspaceId, quote.QuoteId), quote, quote.ExpiresAtUtc);
+        return quote;
     }
 }

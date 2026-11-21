@@ -17,4 +17,8 @@ public class QuoteDto
     public string DestinationCurrency { get; set; } = string.Empty;
 
     public DateTime ExpiresAtUtc { get; set; }
+
+    public string RateProvider { get; set; } = string.Empty;
+
+    public DateOnly RateEffectiveDate { get; set; }
 }
